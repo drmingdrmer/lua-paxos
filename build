@@ -1,0 +1,15 @@
+#!/bin/sh
+
+
+./merge rc \
+    && git rm -r bundle it srv merge build ut *.lua *.py \
+    && echo "/srv/" >> .gitignore \
+    && git add .gitignore lib \
+    && tree_hash=$(git write-tree) \
+    && commit_hash=$( echo "build" | git commit-tree $tree_hash -p refs/heads/master -p HEAD) \
+    && echo commit hash is $commit_hash \
+    && git update-ref refs/heads/master $commit_hash \
+    && git reset --hard HEAD
+
+
+

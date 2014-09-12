@@ -1,0 +1,24 @@
+#!/bin/sh
+
+path=$(pwd)
+bs="$(find ./bundle -name "lib" -type d)"
+
+rm -rf ./lib
+mkdir -p ./lib
+
+for lib in $bs; do
+
+    (
+    cd $lib && (
+    for f in $(ls); do
+        cp -R $path/$lib/$f $path/lib/
+    done
+    )
+    )
+done
+
+if [ ".$1" = ".rc" ]; then
+    (
+    cd ./lib && rm test_*.lua
+    )
+fi
