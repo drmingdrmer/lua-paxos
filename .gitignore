@@ -1,0 +1,5 @@
+luacov.report.out
+luacov.stats.out
+*.pyc
+tags
+/srv/
