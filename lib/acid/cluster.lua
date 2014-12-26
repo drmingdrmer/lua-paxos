@@ -15,8 +15,6 @@ local _M = {
 }
 local _mt = { __index = _M }
 
-local function _true() return true, nil, nil end
-
 function _M.new(impl, opt)
     opt = opt or {}
 
