@@ -55,9 +55,12 @@ end
 
 function _M:api_recv()
 
-    local elts = strutil.split( ngx.var.uri, '/' )
+    local uri = ngx.var.uri
+    uri = uri:sub( #self.api_uri + 2 )
 
-    local cluster_id, ident, cmd = elts[3], elts[4], elts[5]
+    local elts = strutil.split( uri, '/' )
+
+    local cluster_id, ident, cmd = elts[1], elts[2], elts[3]
     local uri_args = {
         cluster_id = cluster_id,
         ident = ident,
