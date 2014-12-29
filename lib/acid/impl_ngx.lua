@@ -3,7 +3,7 @@ local _meta = { __index=_M }
 
 local tableutil = require( "acid.tableutil" )
 local transport = require("acid.impl.transport_ngx_http")
-local storage = require("acid.impl.storage_ngx_mc")
+local storage = require("acid.impl.storage_ngx_fs")
 local locking = require("acid.impl.locking_ngx")
 local time = require("acid.impl.time_ngx")
 local logging = require("acid.impl.logging_ngx")

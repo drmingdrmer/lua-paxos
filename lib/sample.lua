@@ -5,6 +5,7 @@ local _M = {}
 
 local impl = impl_ngx.new({})
 impl.api_uri = '/api'
+impl.sto_base_path = "/tmp/paxos_test"
 impl.tracking_varname = 'paxos_log'
 impl.get_addrs = function( impl, member_id, member )
     local ident = member_id.ident
