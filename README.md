@@ -1,4 +1,4 @@
-lua-poxos
+lua-paxos
 =========
 
 Classic paxos implementation in lua
