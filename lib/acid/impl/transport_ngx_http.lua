@@ -9,6 +9,32 @@ local http = require( "acid.impl.http" )
 
 local errors = paxos.errors
 
+local _status = {
+    OK = 200,
+    BadRequest = 400,
+    InternalError = 500,
+}
+
+local err_to_status = {
+    [errors.InvalidArgument]  = _status.BadRequest,
+    [errors.InvalidMessage]   = _status.BadRequest,
+    [errors.InvalidCommand]   = _status.BadRequest,
+    [errors.InvalidCluster]   = _status.BadRequest,
+    [errors.InvalidPhase]     = _status.BadRequest,
+    [errors.VerNotExist]      = _status.BadRequest,
+    [errors.AlreadyCommitted] = _status.BadRequest,
+    [errors.OldRound]         = _status.BadRequest,
+    [errors.NoView]           = _status.InternalError,
+    [errors.QuorumFailure]    = _status.InternalError,
+    [errors.LockTimeout]      = _status.InternalError,
+    [errors.StorageError]     = _status.InternalError,
+    [errors.NotAccepted]      = _status.BadRequest,
+    [errors.DuringChange]     = _status.BadRequest,
+    [errors.NoChange]         = _status.BadRequest,
+    [errors.Conflict]         = _status.BadRequest,
+    ["."]                     = _status.BadRequest,
+}
+
 function _M.new(opt)
     local e = {}
     setmetatable( e, _meta )
@@ -33,14 +59,14 @@ function _M:send_req(pobj, id, req)
     local ipports = self:get_addrs({cluster_id=req.cluster_id, ident=id}, members[id])
     local ipport = ipports[1]
     local ip, port = ipport[1], ipport[2]
-    local timeout = 500 -- milliseconds
+    local timeout = 6000 -- milliseconds
     local uri = uri .. '?' .. query
 
     local args = {
         body = body,
     }
 
-    local h = http:new( ip, port, 500 )
+    local h = http:new( ip, port, timeout )
     local err, errmes = h:request( uri, args )
     if err then
         self:track(
@@ -50,7 +76,16 @@ function _M:send_req(pobj, id, req)
         return nil, err, errmes
     end
     local rstbody, err, errmes = h:read_body( 1024*1024 )
-    return json.decode( rstbody )
+    if err then
+        return nil, err, errmes
+    end
+
+    local rst, jbody = pcall(json.decode, rstbody)
+    if not rst then
+        return nil, errors.InvalidMessage, "body is not valid json"
+    end
+
+    return jbody
 end
 
 function _M:api_recv()
@@ -89,9 +124,9 @@ function _M:api_resp(rst)
 
     local code
     if type(rst) == 'table' and rst.err then
-        code = 500
+        code = err_to_status[rst.err] or err_to_status["."]
     else
-        code = 200
+        code = _status.OK
     end
 
     rst = json.encode( rst )

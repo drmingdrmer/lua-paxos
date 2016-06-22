@@ -1,5 +1,5 @@
 luacov.report.out
 luacov.stats.out
 *.pyc
+*.so
 tags
-/srv/

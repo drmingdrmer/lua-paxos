@@ -31,6 +31,14 @@ function _M:new_rnd()
     return (ms*1000 + pid)*1000 + c
 end
 
+function _M:new_rnd_incr(rnd)
+    local ms = math.ceil(rnd/(1000*1000)) + 1
+    local pid = ngx.worker.pid() % 1000
+    local c = get_incr_num() % 1000
+
+    return (ms*1000 + pid)*1000 + c
+end
+
 function _M:wait_run(timeout, f, ...)
 
     local co = ngx.thread.spawn(f, ...)

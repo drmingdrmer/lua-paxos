@@ -44,10 +44,22 @@ function _M.new( args, impl )
         return nil, err, errmes
     end
 
+    local _rnd = proposer.record.paxos_round.rnd
+    if round.cmp( _rnd, proposer.rnd ) > 0 then
+        proposer.rnd = round.new( { _rnd[1], proposer.ident } )
+    end
+
     local _, err, errmes = proposer:init_view()
     if err then
         return nil, err, errmes
     end
+
+    -- TODO move cluster_id check to upper level
+    -- local r_cluster_id = proposer.record.committed.val.ec_meta.ec_name
+    -- if  r_cluster_id ~= proposer.cluster_id then
+    --     return nil, errors.InvalidCommitted, r_cluster_id
+    -- end
+
     proposer.acceptors = tableutil.union( proposer.view, true )
 
     return proposer
@@ -60,21 +72,21 @@ function _meth:write( myval )
     --      1. not enough member to form a quorum.
     --      2. there is currently another value accepted.
 
-    local is_mine, val, err = self:decide( myval )
+    local val, err, errmes = self:decide( myval )
     if err then
-        return nil, err
+        return nil, err, errmes
     end
 
-    local c, err = self:commit()
+    local c, err, errmes = self:commit()
     if err then
-        return nil, err
+        return nil, err, errmes
     end
 
     if c.val == myval then
         return { ver=c.ver, val=c.val }, nil
     else
         -- other value is committed
-        return nil, errors.VerNotExist
+        return nil, errors.VerNotExist, 'other value is committed:' .. tableutil.repr(c.val)
     end
 
 end
@@ -94,14 +106,17 @@ function _meth:_remote_read(need_quorum)
     local _resps = self:phase3({ ver=0 })
 
     local resps = {}
+    local err = {}
     for id, resp in pairs(_resps) do
         if resp.err.Code == errors.AlreadyCommitted then
             resps[ id ] = resp
+        else
+            err[ id ] = (resps.err or {}).Code
         end
     end
 
     if need_quorum and not self:is_quorum( resps ) then
-        return nil, errors.QuorumFailure
+        return nil, errors.QuorumFailure, 'remote read: ' .. tableutil.repr(err)
     end
 
     local latest = { ver=0, val=nil }
@@ -112,15 +127,24 @@ function _meth:_remote_read(need_quorum)
         end
     end
 
+    if latest.ver == 0 then
+        return nil, errors.VerNotExist, 'remote read ver is 0'
+    end
+
     return latest
 end
 function _meth:decide( my_val )
 
     if self.stat ~= nil then
-        return false, nil, errors.InvalidPhase, 'phase 1 and 2 has already run'
+        return nil, errors.InvalidPhase, 'phase 1 and 2 has already run'
     end
 
-    self.rnd = round.incr( self.rnd )
+    if self.impl.new_rnd_incr then
+        local _rnd = self.impl.new_rnd_incr(self, self.rnd[1])
+        self.rnd = round.new( {_rnd, self.ident } )
+    else
+        self.rnd = round.incr( self.rnd )
+    end
 
     local resps = self:phase1()
     local accepted_resps, val, stat = self:choose_p1( resps, my_val )
@@ -130,41 +154,41 @@ function _meth:decide( my_val )
 
     st.phase1 = {
         ok = tableutil.keys( accepted_resps ),
-        err = {},
+        err = self:_choose_err( resps ),
     }
-    for id, resp in pairs(resps) do
-        if accepted_resps[ id ] == nil then
-            st.phase1.err[ id ] = (resp.err or {}).Code
-        end
-    end
 
     tableutil.merge( st, stat )
 
     if round.cmp( stat.latest_rnd, self.rnd ) > 0 then
         self.rnd = round.new({ stat.latest_rnd[1], self.rnd[2] })
-        return false, nil, errors.OldRound
+        return nil, errors.OldRound, 'latest round: ' .. tableutil.repr(stat.latest_rnd)
     end
 
     if not self:is_quorum( accepted_resps ) then
-        return false, nil, errors.QuorumFailure
+        return nil, errors.QuorumFailure, 'phase1: ' .. tableutil.repr(st.phase1.err)
     end
 
     resps = self:phase2( val )
     self.p2 = resps
-    resps = self:choose_p2( resps )
+    accepted_resps = self:choose_p2( resps )
 
-    if not self:is_quorum( resps ) then
-        return false, nil, errors.QuorumFailure
+    st.phase2 = {
+        ok = tableutil.keys( accepted_resps ),
+        err = self:_choose_err( resps ),
+    }
+
+    if not self:is_quorum( accepted_resps ) then
+        return nil, errors.QuorumFailure, 'phase2: ' .. tableutil.repr(st.phase2.err)
     end
 
     self.stat.accepted_val = val
 
-    return val == my_val, val, nil
+    return val, nil, nil
 end
 function _meth:commit()
-    local c, err = self:make_commit_data()
+    local c, err, errmes = self:make_commit_data()
     if err then
-        return nil, err
+        return nil, err, errmes
     end
     return self:commit_specific(c)
 end
@@ -176,10 +200,10 @@ function _meth:commit_specific(c)
     if ok then
         return { ver=c.ver, val=c.val }, nil
     else
-        return nil, errors.QuorumFailure
+        local err = self:_choose_err(resps)
+        return nil, errors.QuorumFailure, 'commit specific: ' .. tableutil.repr(err)
     end
 end
-
 -- paxos level api
 function _meth:phase1()
     local mes = {
@@ -274,6 +298,16 @@ function _meth:_choose_no_err(resps)
     return positive
 end
 
+function _meth:_choose_err(resps)
+    local err = {}
+    for id, resp in pairs(resps) do
+        if resp.err ~= nil then
+            err[ id ] = (resp.err or {}).Code
+        end
+    end
+    return err
+end
+
 function _meth:make_commit_data()
     if self.stat == nil then
         return nil, errors.InvalidPhase, 'phase 1 or 2 has not yet run'
@@ -300,7 +334,7 @@ function _meth:is_quorum( accepted )
         local n = tableutil.nkeys( tableutil.intersection( { accepted, group } ) )
         local total = tableutil.nkeys( group )
 
-        if n <= total / 2 then
+        if total > 0 and n <= total / 2 then
             return false
         end
 

@@ -20,19 +20,12 @@ _M.errors = {
     DuringChange     = 'DuringChange',
     NoChange         = 'NoChange',
     Conflict         = 'Conflict',
+    InvalidCommitted = 'InvalidCommitted',
 }
 local errors = _M.errors
 
-function _M.load_rec( self )
-
-    local r, err, errmes = self.impl:load(self)
-
-    if err then
-        return nil, err, errmes
-    end
-
+function _M.init_rec( self, r )
     r = r or {}
-
     r.committed = r.committed or {
         ver = 0,
         val = nil,
@@ -51,6 +44,20 @@ function _M.load_rec( self )
     return nil, nil, nil
 end
 
+function _M.load_rec( self, opt )
+
+    opt = opt or {}
+    local ignore_err = opt.ignore_err == true
+
+    local r, err, errmes = self.impl:load(self)
+
+    if err and not ignore_err then
+        return nil, err, errmes
+    end
+
+    return self:init_rec( r )
+end
+
 function _M.init_view( self )
 
     for _ = 0, 0 do
@@ -66,7 +73,7 @@ function _M.init_view( self )
         end
 
         local v = val.view
-        if v == nil or v[ 1 ] == nil or tableutil.nkeys( v[ 1 ] ) == 0 then
+        if v == nil or v[ 1 ] == nil then
             break
         end
 

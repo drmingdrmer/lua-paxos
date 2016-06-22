@@ -131,7 +131,7 @@ function _meth:sync()
 
     -- newer version seen
     if self.ver ~= nil and self.ver ~= c.ver then
-        return nil, errors.VerNotExist
+        return nil, errors.VerNotExist, 'newer version:' .. tostring(c.ver)
     end
 
     return c, nil, nil

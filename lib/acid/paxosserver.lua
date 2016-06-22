@@ -16,6 +16,7 @@ _M.adm_method = {
     isalive = true,
 
     read = true,
+    local_read = true,
 }
 
 local function _true() return true, nil, nil end
@@ -76,7 +77,7 @@ function _M:_handle_req(req)
         local locked = paxoshelper.with_cluster_locked
 
         if cmd == 'change_view' then
-            local changes = tableutil.sub( req, {"add", "del"} )
+            local changes = tableutil.sub( req, {"add", "del", "merge"} )
             return locked( paxos, function()
                 return ph.change_view( paxos, changes )
             end)
@@ -103,6 +104,11 @@ function _M:_handle_req(req)
             -- low level read return entire paxos content in a single "val"
             -- field.
             return paxos:quorum_read()
+
+        elseif cmd == 'local_read' then
+            -- same as 'read' but return value in local storage without
+            -- querying other member for latest committed value.
+            return paxos:read()
         end
 
     elseif self.handlers[cmd] then
@@ -123,11 +129,16 @@ function _M:_isalive(paxos, req)
         return nil, "NotMember", nil
     end
 
-    if self.impl:is_data_valid(paxos, _mem.val) then
-        return {}, nil, nil
-    else
-        return nil, "Damaged", nil
+    local rst, err, errmes = self.impl:is_member_valid(paxos, _mem.val)
+    if not rst then
+        return nil, "Damaged", tostring(err) .. ', ' .. tostring(errmes)
     end
+
+    if self.impl:is_needed_migrate(paxos, _mem.val) then
+        return nil, 'Migrating', nil
+    end
+
+    return {}, nil, nil
 end
 
 function _M:new_paxos(member_id, ver)

@@ -47,6 +47,20 @@ local function committable(self)
     return true
 end
 
+local function is_committed_valid( self )
+
+    -- TODO move to upper level
+    -- local r_cluster_id = self.record.committed.val.ec_meta.ec_name
+    -- if  r_cluster_id ~= self.cluster_id then
+    --     self.err = {
+    --         Code = errors.InvalidCommitted,
+    --         Message = {r_cluster_id=r_cluster_id, cluster_id=self.cluster_id}
+    --     }
+    --     return false
+    -- end
+    return true
+end
+
 function _M.new(args, impl)
     local acc = {
         cluster_id = args.cluster_id,
@@ -136,7 +150,7 @@ function _meth:process(mes)
     -- TODO pcall
     local _l, err = self.impl:lock(self)
     if err then
-        self.impl:logerr("timeout:", tableutil.str(self))
+        self.impl:logerr("acceptor process lock timeout: ", self.cluster_id)
         return nil, errors.LockTimeout, nil
     end
 
@@ -147,6 +161,10 @@ function _meth:process(mes)
     return rst, err, errmes
 end
 function _meth:store_or_err()
+
+    if not is_committed_valid( self ) then
+        return nil, self.err.Code, self.err.Message
+    end
 
     self:lease_to_expire()
     local _, err, errmes = self.impl:store(self)
@@ -167,6 +185,10 @@ function _meth:phase1()
     local _, err, errmes = self:init_view()
     if err then
         return nil, err, errmes
+    end
+
+    if not is_committed_valid( self ) then
+        return nil, self.err.Code, self.err.Message
     end
 
     if not is_next_ver( self ) then
@@ -206,6 +228,10 @@ function _meth:phase2()
         return nil, err, errmes
     end
 
+    if not is_committed_valid( self ) then
+        return nil, self.err.Code, self.err.Message
+    end
+
     if not is_next_ver( self ) then
         return nil, self.err.Code, self.err.Message
     end
@@ -224,9 +250,16 @@ end
 function _meth:phase3()
     -- aka commit
 
-    local _, err, errmes = self:load_rec()
-    if err then
-        return nil, err, errmes
+    self:load_rec({ignore_err=true})
+
+    if self.record.committed.ver > 0
+        and not is_committed_valid(self) then
+        if self.mes.ver < 1 then
+            return nil, self.err.Code, self.err.Message
+        else
+            -- initial record, make it can store the correct committed
+            self:init_rec()
+        end
     end
 
     if not committable( self ) then
@@ -251,17 +284,29 @@ function _meth:phase3()
         and rec.committed.__tag ~= self.mes.__tag
         and rec.committed.ver == self.mes.ver then
 
-        local err = errors.Conflict
-        local errmes = {
-            ver=self.mes.ver,
-            mes_tag=self.mes.__tag,
-            committed_tag=rec.committed.__tag,
-        }
+        local cval = tableutil.dup( rec.committed.val, true )
+        local mval = tableutil.dup( self.mes.val, true )
+        local cleader = cval.leader or {}
+        local mleader = mval.leader or {}
+        cleader.__lease = nil
+        mleader.__lease = nil
 
-        self.impl:logerr( 'conflict: ', err, errmes )
+        if not tableutil.eq(cval, mval) then
+            local err = errors.Conflict
+            local errmes = {
+                ver=self.mes.ver,
+                mes_tag=self.mes.__tag,
+                committed_tag=rec.committed.__tag,
+                mes_val=self.mes.val,
+                committed_val=rec.committed.val,
+                mes_val=self.mes.val,
+                committed_val=rec.committed.val
+            }
 
-        return nil, err, errmes
+            self.impl:logerr( 'conflict: ', err, errmes )
 
+            return nil, err, errmes
+        end
     end
 
     rec.committed = {

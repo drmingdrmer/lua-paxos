@@ -7,14 +7,21 @@ local nr_retry = 5
 
 function _M.get_or_elect_leader(paxos, lease)
 
-    local rst, err, errmes = paxos:get( 'leader' )
+    local rst, err, errmes = paxos:local_get( 'leader' )
     if err then
+        paxos:logerr( {err=err, errmes=errmes}, "while local_get('leader'):", paxos.member_id)
         return nil, err, errmes
     end
+
+    -- start to track version change. if version changed,
+    -- paxos stops any write operation.
+    paxos.ver = rst.ver
 
     if rst.val ~= nil then
         return rst, nil, nil
     end
+
+    paxos:logerr( rst, "leader not found for:", paxos.member_id)
 
     return _M.elect_leader( paxos, lease )
 end
@@ -28,6 +35,7 @@ function _M.change_view(paxos, changes)
     -- changes = {
     --     add = { a=1, b=1 },
     --     del = { c=1, d=1 },
+    --     merge = { f1={ f2={} } },
     -- }
 
     -- change_view push cluster to a consistent state:
@@ -54,21 +62,23 @@ function _M.change_view(paxos, changes)
     return nil, errors.QuorumFailure
 end
 function _M._change_view(paxos, changes)
-
-    local c, err, errmes = paxos:local_get("view")
+    local c, err, errmes = paxos:read()
     if err then
         return nil, err, errmes
     end
 
-    local view, err, errmes = _M._make_2group_view(c.val, changes )
+    _M._merge_changes( c.val, changes.merge or {} )
+
+    local cval = c.val
+
+    local view, err, errmes = _M._make_2group_view(cval.view, changes )
     if err then
 
         if err == errors.DuringChange then
             paxos:sync()
-            local view = c.val
-            if #view == 2 then
-                table.remove( view, 1 )
-                paxos:set( "view", view )
+            if #cval.view == 2 then
+                table.remove( cval.view, 1 )
+                _M._set_change_view( paxos, c )
             end
         elseif err == errors.NoChange then
             return c, nil, nil
@@ -77,20 +87,50 @@ function _M._change_view(paxos, changes)
         return nil, err, errmes
     end
 
-    local c, err, errmes = paxos:set( "view", view )
+    cval.view = view
+
+    local _, err, errmes = _M._set_change_view( paxos, c )
     if err then
         return nil, err, errmes
     end
 
     -- After update to dual-group view, commit once more with the new view to
     -- create new member.
-    local c, err, errmes = paxos:sync()
+    local _, err, errmes = paxos:sync()
     if err then
         return nil, err, errmes
     end
 
-    table.remove( view, 1 )
-    return paxos:set( "view", view )
+    table.remove( cval.view, 1 )
+    return _M._set_change_view( paxos, c )
+end
+
+function _M._set_change_view( paxos, c )
+    local _c, err, errmes = paxos:read()
+    if err then
+        return nil, err, errmes
+    end
+
+    if tableutil.eq( c.val, _c.val ) then
+
+        local p, err, errmes = paxos:new_proposer()
+        if err then
+            return nil, err, errmes
+        end
+
+        local c, err, errmes = p:commit_specific(_c)
+        if err then
+            return nil, err, errmes
+        end
+        return c, nil, nil
+    end
+
+    local c, err, errmes = paxos:write(c.val)
+    if err then
+        return nil, err, errmes
+    end
+
+    return c, nil, nil
 end
 
 function _M.with_cluster_locked(paxos, f, exptime)
@@ -135,6 +175,21 @@ function _M._make_2group_view(view, changes)
 
     return view, nil, nil
 end
+
+-- merge cannot be nested loop table
+function _M._merge_changes(c, merge)
+
+    for k, v in pairs(merge) do
+        if type(v) == 'table' and type(c[k]) == 'table' then
+            _M._merge_changes( c[k], v )
+        else
+            c[ k ] = v
+        end
+    end
+
+    return c
+end
+
 function _M._sleep(paxos)
     if paxos.impl.sleep then
         paxos.impl:sleep()

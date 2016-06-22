@@ -78,7 +78,7 @@ In this implementation, all of the data is stored altogether in one record:
             { a=1, b=1, c=1 },
             { b=1, c=1, d=1 },
         },
-        leader = { ident="id", __lease=10000000 },
+        leader = { ident="id", __expire=10000000 },
         action = {
             { name="bla", args={} },
             { name="foo", args={} },

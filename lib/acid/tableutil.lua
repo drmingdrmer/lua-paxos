@@ -226,4 +226,48 @@ function _M._repr_lines(t, opt)
     return lst
 end
 
+function _M.iter(tbl)
+
+    local ks = _M.keys(tbl)
+    local i = 0
+
+    table.sort( ks, function( a, b ) return tostring(a)<tostring(b) end )
+
+    return function()
+        i = i + 1
+        local k = ks[i]
+        if k == nil then
+            return
+        end
+        return ks[i], tbl[ks[i]]
+    end
+end
+
+function _M.deep_iter(tbl)
+
+    local ks = {}
+    local iters = {_M.iter( tbl )}
+    local tabletype = type({})
+
+    return function()
+
+        while #iters > 0 do
+
+            local k, v = iters[#iters]()
+
+            if k == nil then
+                ks[#iters], iters[#iters] = nil, nil
+            else
+                ks[#iters] = k
+
+                if type(v) == tabletype then
+                    table.insert(iters, _M.iter(v))
+                else
+                    return ks, v
+                end
+            end
+        end
+    end
+end
+
 return _M
