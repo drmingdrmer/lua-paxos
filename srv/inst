@@ -1,0 +1,13 @@
+#!/bin/sh
+
+path=$(pwd)
+nn=ngx_openresty-1.7.4.1
+
+(
+cd $nn \
+    && ./configure --prefix=$path && make && make install
+) \
+    && (
+cd nginx \
+    && rm -rf *_temp html conf/*
+)

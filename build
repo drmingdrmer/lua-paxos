@@ -1,0 +1,18 @@
+#!/bin/bash
+
+to_rm="bundle it srv merge build backup ut *.lua *.py"
+
+./merge rc \
+    && cur_hash=$(git rev-parse HEAD) \
+    && parent=refs/heads/master \
+    && git rm -r $to_rm \
+    && echo "/srv/" >> .gitignore \
+    && git add .gitignore lib \
+    && tree_hash=$(git write-tree) \
+    && commit_hash=$( echo "build from ${cur_hash:0:7}" | git commit-tree $tree_hash -p $parent) \
+    && echo commit hash is $commit_hash \
+    && git update-ref $parent $commit_hash \
+    && git reset --hard HEAD
+
+
+

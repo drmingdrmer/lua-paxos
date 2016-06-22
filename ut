@@ -1,0 +1,23 @@
+#!/bin/bash
+
+luacov="/opt/local/share/luarocks//lib/luarocks/rocks/luacov/0.6-1/bin/luacov"
+
+case $1 in
+    cov)
+        cov_flag="-l luacov"
+        ;;
+    *)
+        cov_flag=
+        ;;
+esac
+
+(
+cd lib || exit 1
+
+lua $cov_flag -l acid.unittest || exit 1
+
+if [ ".$cov_flag" != "." ]; then
+    $luacov && tail -n20 luacov.report.out
+fi
+
+) && echo ok || { echo fail; exit 1; }

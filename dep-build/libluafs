@@ -1,0 +1,8 @@
+#!/bin/bash
+
+(
+p=dep/libluafs
+( cd $p && CPATH=$CPATH:/usr/include/lua5.1 make; ) \
+    && cp $p/libluafs.so clib/ \
+    && ( cd $p && make clean; )
+)

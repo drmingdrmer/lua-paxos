@@ -1,0 +1,4 @@
+[submodule "dep/libluafs"]
+	path = dep/libluafs
+	url = https://github.com/drmingdrmer/libluafs.git
+	branch = master

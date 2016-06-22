@@ -1,0 +1,6 @@
+/bin/
+/nginx/
+/luajit/
+/lualib/
+/ngx_openresty-1.7.4.1/Makefile
+/ngx_openresty-1.7.4.1/build/
