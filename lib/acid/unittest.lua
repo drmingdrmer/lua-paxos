@@ -76,6 +76,11 @@ local testfuncs = {
     end,
 
     eqlist= function( self, a, b, mes )
+
+        if a == b then
+            return
+        end
+
         self:neq( nil, a, "left list is not nil " .. (mes or '') )
         self:neq( nil, b, "right list is not nil " .. (mes or '') )
 
@@ -95,8 +100,8 @@ local testfuncs = {
             return
         end
 
-        self:neq( nil, a, "left table is not nil" .. mes )
-        self:neq( nil, b, "right table is not nil" .. mes )
+        self:neq( nil, a, "left table is not nil " .. mes )
+        self:neq( nil, b, "right table is not nil " .. mes )
         local akeys, an = keys( a )
         local bkeys, bn = keys( b )
 
