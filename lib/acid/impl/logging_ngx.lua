@@ -36,21 +36,20 @@ function _M:track(...)
         return
     end
 
-    local nv = ngx.var
     local vname = self.tracking_varname
     if vname == nil then
         return
     end
 
-    if nv[vname] == nil then
+    if ngx.var[vname] == nil then
         return
     end
     local s = logging.tostr(...)
 
-    if nv[vname] == "" then
-        nv[vname] = s
+    if ngx.var[vname] == "" then
+        ngx.var[vname] = s
     else
-        nv[vname] = nv[vname] .. ', ' .. s
+        ngx.var[vname] = ngx.var[vname] .. ', ' .. s
     end
 end
 
