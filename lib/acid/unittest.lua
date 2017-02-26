@@ -76,8 +76,8 @@ local testfuncs = {
     end,
 
     eqlist= function( self, a, b, mes )
-        self:neq( nil, a, "left list is not nil" )
-        self:neq( nil, b, "right list is not nil" )
+        self:neq( nil, a, "left list is not nil " .. (mes or '') )
+        self:neq( nil, b, "right list is not nil " .. (mes or '') )
 
         for i, e in ipairs(a) do
             self:ass( e==b[i], i .. 'th elt to be ' .. tostr(e) .. ' but is ' .. tostr(b[i]), mes )
