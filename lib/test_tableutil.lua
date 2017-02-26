@@ -73,8 +73,9 @@ function test_sub(t)
     }
 
     for i, case in ipairs(cases) do
+        local tbl, ks, expected = unpack(case)
         local rst = tableutil.sub(tbl, ks, true)
-        t:eqdict(expected, rst, to_str(case))
+        t:eqdict(expected, rst, to_str(i .. 'th case: ', case))
     end
 end
 
@@ -528,7 +529,7 @@ function test_has(t)
 
     for i, case in ipairs(cases) do
         local val, tbl, expected = case[1], case[2], case[3]
-        t:eq(expected, tableutil.has(tbl, val), i .. 'th case: ' .. to_str(val, tbl))
+        t:eq(expected, tableutil.has(tbl, val), i .. 'th case: ' .. to_str(val, ' ', tbl))
     end
 end
 
@@ -580,12 +581,11 @@ function test_extends(t)
 
     for _, c in ipairs( cases ) do
 
+        local msg = to_str(c)
+
         local exp   = c[3]
-        local actul = tableutil.extends(c[1], c[2])
+        local rst = tableutil.extends(c[1], c[2])
 
-        local msg = "expect: " .. to_str( exp ) ..
-                   ", actul: " .. to_str( actul )
-
-        t:eqlist( actul, exp, msg )
+        t:eqdict(exp, rst, msg)
     end
 end

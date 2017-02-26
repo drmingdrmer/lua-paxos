@@ -92,7 +92,7 @@ function _M.sub(tbl, ks, list)
     local t = {}
     for _, k in ipairs(ks) do
         if list then
-            table.insert(tbl[k])
+            table.insert(t, tbl[k])
         else
             t[k] = tbl[k]
         end
@@ -277,6 +277,11 @@ function _M.deep_iter(tbl)
 end
 
 function _M.has(tbl, value)
+
+    if value == nil then
+        return true
+    end
+
     for _, v in pairs(tbl) do
         if v == value then
             return true
