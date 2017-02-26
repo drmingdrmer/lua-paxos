@@ -11,6 +11,8 @@ case $1 in
         ;;
 esac
 
+export LUA_CPATH="$LUA_CPATH;$(pwd)/clib/?.so;"
+
 (
 cd lib || exit 1
 
