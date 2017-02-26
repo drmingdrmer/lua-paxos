@@ -2,3 +2,7 @@
 	path = dep/libluafs
 	url = https://github.com/drmingdrmer/libluafs.git
 	branch = master
+[submodule "dep/cjson"]
+	path = dep/cjson
+	url = https://github.com/drmingdrmer/lua-cjson.git
+	branch = master
