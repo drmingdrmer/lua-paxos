@@ -4,6 +4,8 @@ local tableutil = require("acid.tableutil")
 
 local _M = {}
 
+-- TODO test
+
 -- use cache must be declare shared dict 'paxos_shared_lock'
 -- in nginx configuration
 
@@ -13,7 +15,7 @@ _M.accessor = {
     proc = {
             get = function( dict, key, opts )
 
-                    if opts.update_get ~= nil then
+                    if opts.flush then
                         return nil
                     end
 
@@ -41,7 +43,7 @@ _M.accessor = {
 
     shdict = {
             get = function( dict, key, opts )
-                    if opts.update_get ~= nil then
+                    if opts.flush then
                         return nil
                     end
 
