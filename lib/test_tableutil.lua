@@ -73,7 +73,7 @@ function test_sub(t)
     }
 
     for i, case in ipairs(cases) do
-        local rst = tableutil.sub(tbl, ks, list=true)
+        local rst = tableutil.sub(tbl, ks, true)
         t:eqdict(expected, rst, to_str(case))
     end
 end
