@@ -1,5 +1,7 @@
 local _M = { _VERSION = '0.1' }
 
+math.randomseed(os.time() * 1000)
+
 function _M.nkeys(tbl)
     return #_M.keys(tbl)
 end
@@ -48,7 +50,7 @@ function _M.dup(tbl, deep, ref_table)
         end
         t[ k ] = v
     end
-    return t
+    return setmetatable(t, getmetatable(tbl))
 end
 
 local function _contains(a, b, ref_table)
@@ -85,11 +87,15 @@ function _M.eq(a, b)
     return _M.contains(a, b) and _M.contains(b, a)
 end
 
-function _M.sub(tbl, ks)
+function _M.sub(tbl, ks, list)
     ks = ks or {}
     local t = {}
     for _, k in ipairs(ks) do
-        t[k] = tbl[k]
+        if list then
+            table.insert(tbl[k])
+        else
+            t[k] = tbl[k]
+        end
     end
     return t
 end
@@ -270,4 +276,116 @@ function _M.deep_iter(tbl)
     end
 end
 
+function _M.has(tbl, value)
+    for _, v in pairs(tbl) do
+        if v == value then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- TODO test. or use has()
+function _M.in_table(value, tbl)
+    for _, v in pairs(tbl) do
+        if v == value then
+            return true
+        end
+    end
+
+    return false
+end
+
+function _M.remove(tbl, value)
+
+    for k, v in pairs(tbl) do
+        if v == value then
+            -- int, shift
+            if type(k) == 'number' and k % 1 == 0 then
+                table.remove(tbl, k)
+            else
+                tbl[k] = nil
+            end
+            return v
+        end
+    end
+
+    return nil
+end
+
+-- TODO  test or remove this
+function _M.remove_value(value, tbl)
+    local removed = false
+
+    for i = #tbl, 1, -1 do
+        if tbl[i] == value then
+            table.remove(tbl, i)
+            removed = true
+        end
+    end
+
+    return removed
+end
+
+-- TODO  test or remove this
+function _M.get_sub_table(tbl, keys)
+    local sub = {}
+
+    for _, k in ipairs(keys) do
+        table.insert(sub, tbl[k])
+    end
+
+    return sub
+end
+
+function _M.get_len(tbl)
+    local len = 0
+    for _, _ in pairs(tbl) do
+        len = len + 1
+    end
+
+    return len
+end
+
+-- TODO  test
+function _M.get_random_elements(tbl, n)
+    local idx
+    local rnd
+    local tlen
+    local elmts = {}
+
+    if type(tbl) ~= 'table' then
+        return tbl
+    end
+
+    tlen = #tbl
+    if tlen == 0 then
+        return {}
+    end
+
+    n = math.min(n or tlen, tlen)
+    rnd = math.random(1, tlen)
+
+    for i = 1, n, 1 do
+        idx = (rnd+i) % tlen + 1
+        table.insert(elmts, tbl[idx])
+    end
+
+    return elmts
+end
+
+function _M.extends( tbl, tvals )
+
+    if type(tbl) ~= 'table' or tvals == nil then
+        return tbl
+    end
+
+    -- Note: will be discarded after nil elements in tvals
+    for i, v in ipairs( tvals ) do
+        table.insert( tbl, v )
+    end
+
+    return tbl
+end
 return _M

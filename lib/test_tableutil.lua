@@ -1,14 +1,28 @@
-local tableutil = require( "acid.tableutil" )
+local tableutil = require("acid.tableutil")
+local strutil = require("acid.strutil")
+
+local tb_eq = tableutil.eq
+local to_str = strutil.to_str
 
 function test_nkeys(t)
-    t:eq( 0, tableutil.nkeys( {} ), 'nkeys of empty' )
-    t:eq( 1, tableutil.nkeys( {0} ), 'nkeys of 1' )
-    t:eq( 2, tableutil.nkeys( {0, nil, 1} ), 'nkeys of 0, nil and 1' )
-    t:eq( 2, tableutil.nkeys( {0, 1} ), 'nkeys of 2' )
-    t:eq( 2, tableutil.nkeys( {0, 1, nil} ), 'nkeys of 0, 1 and nil' )
+    local cases = {
+        {0, {}, 'nkeys of empty'},
+        {1, {0}, 'nkeys of 1'},
+        {2, {0, nil, 1}, 'nkeys of 0, nil and 1'},
+        {2, {0, 1}, 'nkeys of 2'},
+        {2, {0, 1, nil}, 'nkeys of 0, 1 and nil'},
+        {1, {a=0, nil}, 'nkeys of a=1'},
+        {2, {a=0, b=2, nil}, 'nkeys of a=1'},
+    }
 
-    t:eq( 1, tableutil.nkeys( {a=0, nil} ), 'nkeys of a=1' )
-    t:eq( 2, tableutil.nkeys( {a=0, b=2, nil} ), 'nkeys of a=1' )
+    for i, case in ipairs(cases) do
+        local n, tbl, mes = case[1], case[2], case[3]
+        local rst = tableutil.nkeys(tbl)
+        t:eq(n, rst, 'nkeys:' .. mes)
+
+        rst = tableutil.get_len(tbl)
+        t:eq(n, rst, 'get_len:' .. mes)
+    end
 end
 
 function test_keys(t)
@@ -48,6 +62,20 @@ function test_sub(t)
     local b = tableutil.sub( a, {"a", "b", "c"} )
     t:neq( b, a )
     t:eq( b.c, a.c, "reference" )
+
+    -- sub list
+
+    local cases = {
+        {{1, 2, 3}, {}, {}},
+        {{1, 2, 3}, {2, 3}, {2, 3}},
+        {{1, 2, 3}, {2, 3, 4}, {2, 3}},
+        {{1, 2, 3}, {3, 4, 2}, {3, 2}},
+    }
+
+    for i, case in ipairs(cases) do
+        local rst = tableutil.sub(tbl, ks, list=true)
+        t:eqdict(expected, rst, to_str(case))
+    end
 end
 
 function test_dup(t)
@@ -479,4 +507,85 @@ function test_iter(t)
         t:eqdict( r[i], {ks, v} )
     end
 
+end
+
+
+function test_has(t)
+    local cases = {
+        {nil, {}, true},
+        {1, {1}, true},
+        {1, {1, 2}, true},
+        {1, {1, 2, 'x'}, true},
+        {'x', {1, 2, 'x'}, true},
+
+        {1, {x=1}, true},
+
+        {'x', {x=1}, false},
+        {"x", {1}, false},
+        {"x", {1, 2}, false},
+        {1, {}, false},
+    }
+
+    for i, case in ipairs(cases) do
+        local val, tbl, expected = case[1], case[2], case[3]
+        t:eq(expected, tableutil.has(tbl, val), i .. 'th case: ' .. to_str(val, tbl))
+    end
+end
+
+
+function test_remove(t)
+    local t1 = {}
+    local cases = {
+        {{},                nil, {},                nil},
+        {{1, 2, 3},         2,   {1, 3},            2},
+        {{1, 2, 3, x=4},    2,   {1, 3, x=4},       2},
+        {{1, 2, 3},         3,   {1, 2},            3},
+        {{1, 2, 3, x=4},    3,   {1, 2, x=4},       3},
+        {{1, 2, 3, x=4},    4,   {1, 2, 3},         4},
+        {{1, 2, 3, x=t1},   t1,  {1, 2, 3},         t1},
+
+        {{1, 2, t1, x=t1}, t1,   {1, 2, x=t1}, t1},
+    }
+    
+    for i, case in ipairs(cases) do
+
+        local tbl, val, expected_tbl, expected_rst = case[1], case[2], case[3], case[4]
+
+        local rst = tableutil.remove(tbl, val)
+
+        t:eqdict(expected_tbl, tbl, i .. 'th tbl')
+        t:eq(expected_rst, rst, i .. 'th rst')
+    end
+end
+
+
+
+function test_extends(t)
+
+    local cases = {
+
+        {{1,2},     {3,4},       {1,2,3,4}},
+        {{1,2},     {3},         {1,2,3}},
+        {{1,2},     {nil},       {1,2}},
+        {{1,2},     {},          {1,2}},
+        {{},        {1,2},       {1,2}},
+        {nil,       {1},         nil},
+        {{1,{2,3}}, {4,5},       {1,{2,3},4,5}},
+        {{1},       {{2,3},4,5}, {1,{2,3},4,5}},
+        {{"xx",2},  {3,"yy"},    {"xx",2,3,"yy"}},
+        {{1,2},     {3,nil,4},   {1,2,3}},
+        {{1,nil,2}, {3,4},       {1,nil,2,3,4}},
+
+    }
+
+    for _, c in ipairs( cases ) do
+
+        local exp   = c[3]
+        local actul = tableutil.extends(c[1], c[2])
+
+        local msg = "expect: " .. to_str( exp ) ..
+                   ", actul: " .. to_str( actul )
+
+        t:eqlist( actul, exp, msg )
+    end
 end
