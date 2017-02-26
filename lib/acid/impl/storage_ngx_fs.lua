@@ -159,7 +159,7 @@ function _M:load(pobj, isupdate)
     local key = table.concat( {'paxos', pobj.cluster_id, pobj.ident}, '/' )
     local opts = { exptime = 60 * 30,
                    args    = { self, pobj },
-                   update_get = isupdate}
+                   flush = isupdate}
 
     local r, err, errmes = cache.cacheable( ngx.shared.paxos_shared_dict, key, _M._load, opts )
     if err then
